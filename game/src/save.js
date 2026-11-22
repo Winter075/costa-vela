@@ -1,51 +1,39 @@
-// Costa Vela progression saved to localStorage: cash, respect, garage and mission progress.
+// Local storage saves, respect ranks and garage upgrades.
+
 import { RANKS } from './config.js';
 
 const KEY = 'costa-vela-save-v1';
 
-export function freshProgress() {
-  return {
-    cash: 1250,
-    respect: 0,
-    missionIndex: 0,
-    ownedVehicles: [0, 1],
-    upgrades: { engine: 0, armour: 0, brakes: 0 },
-    radioStation: 0,
-    lastPlayed: Date.now(),
-  };
+export function rankFor(respect) {
+  let name = RANKS[0].name;
+  for (const r of RANKS) if (respect >= r.at) name = r.name;
+  return name;
 }
 
-export function loadProgress() {
+export function nextRank(respect) {
+  return RANKS.find((r) => r.at > respect) || null;
+}
+
+export function blankSave() {
+  return { mission: 0, cash: 1250, respect: 0, weapon: 0, upgrades: { engine: 0, armour: 0, brakes: 0 }, owned: 6, radio: 0 };
+}
+
+export function loadSave() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || typeof data.cash !== 'number') return null;
-    return { ...freshProgress(), ...data };
-  } catch {
+    return { ...blankSave(), ...data, upgrades: { ...blankSave().upgrades, ...(data.upgrades || {}) } };
+  } catch (e) {
     return null;
   }
 }
 
-export function saveProgress(progress) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...progress, lastPlayed: Date.now() }));
-    return true;
-  } catch {
-    return false;
-  }
+export function writeSave(data) {
+  try { localStorage.setItem(KEY, JSON.stringify(data)); return true; }
+  catch (e) { return false; }
 }
 
-export function clearProgress() {
-  try { localStorage.removeItem(KEY); } catch { /* storage may be disabled */ }
-}
-
-export function rankFor(respect) {
-  let result = RANKS[0];
-  for (const rank of RANKS) if (respect >= rank.min) result = rank;
-  return result;
-}
-
-export function nextRank(respect) {
-  return RANKS.find((rank) => rank.min > respect) ?? null;
+export function upgradeCost(level, base) {
+  return Math.round(base * (1 + level * 0.65));
 }

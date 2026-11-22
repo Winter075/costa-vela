@@ -1,91 +1,43 @@
-// Costa Vela keyboard and mouse input. Held keys, one-shot presses and orbit drag live here.
+// Keyboard and mouse state. Edge-triggered actions are consumed once per press.
 
-const BLOCKED = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
-
-export class InputController {
+export class Input {
   constructor(canvas) {
-    this.canvas = canvas;
     this.held = new Set();
     this.pressed = new Set();
-    this.fireHeld = false;
-    this.firePressed = false;
-    this.dragDX = 0;
-    this.dragDY = 0;
     this.dragging = false;
-    this.lastX = 0;
-    this.lastY = 0;
-    this.enabled = true;
-
-    window.addEventListener('keydown', (event) => {
-      if (BLOCKED.has(event.code)) event.preventDefault();
-      if (!event.repeat) this.pressed.add(event.code);
-      this.held.add(event.code);
+    this.dragX = 0;
+    this.orbit = 0;
+    this.fire = false;
+    this.canvas = canvas;
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (!this.held.has(key)) this.pressed.add(key);
+      this.held.add(key);
+      if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) e.preventDefault();
     });
-    window.addEventListener('keyup', (event) => this.held.delete(event.code));
+    window.addEventListener('keyup', (e) => this.held.delete(e.key.toLowerCase()));
     window.addEventListener('blur', () => { this.held.clear(); this.dragging = false; });
-
-    canvas.addEventListener('mousedown', (event) => {
-      if (event.button === 0) {
-        this.fireHeld = true;
-        this.firePressed = true;
-        this.dragging = true;
-        this.lastX = event.clientX;
-        this.lastY = event.clientY;
-      } else if (event.button === 2) {
-        this.dragging = true;
-        this.lastX = event.clientX;
-        this.lastY = event.clientY;
-      }
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) this.fire = true;
+      if (e.button === 2) { this.dragging = true; this.dragX = e.clientX; }
     });
-    window.addEventListener('mouseup', (event) => {
-      this.fireHeld = false;
-      this.dragging = false;
-      if (event.button === 2) this.dragging = false;
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.fire = false;
+      if (e.button === 2) this.dragging = false;
     });
-    window.addEventListener('mousemove', (event) => {
-      if (!this.dragging) return;
-      this.dragDX += event.clientX - this.lastX;
-      this.dragDY += event.clientY - this.lastY;
-      this.lastX = event.clientX;
-      this.lastY = event.clientY;
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    window.addEventListener('mousemove', (e) => {
+      if (this.dragging) { this.orbit += (e.clientX - this.dragX) * 0.006; this.dragX = e.clientX; }
     });
-    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
   }
 
-  isDown(code) { return this.held.has(code); }
+  down(key) { return this.held.has(key); }
 
-  consume(code) {
-    if (!this.pressed.has(code)) return false;
-    this.pressed.delete(code);
+  take(key) {
+    if (!this.pressed.has(key)) return false;
+    this.pressed.delete(key);
     return true;
   }
 
-  consumeFire() {
-    const value = this.firePressed;
-    this.firePressed = false;
-    return value;
-  }
-
-  takeOrbit() {
-    const delta = { x: this.dragDX, y: this.dragDY };
-    this.dragDX = 0;
-    this.dragDY = 0;
-    return delta;
-  }
-
-  endFrame() {
-    this.pressed.clear();
-    this.firePressed = false;
-  }
-
-  // Movement axes used by both driving and on-foot mode.
-  axes() {
-    let x = 0;
-    let z = 0;
-    if (this.isDown('KeyW') || this.isDown('ArrowUp')) z -= 1;
-    if (this.isDown('KeyS') || this.isDown('ArrowDown')) z += 1;
-    if (this.isDown('KeyA') || this.isDown('ArrowLeft')) x -= 1;
-    if (this.isDown('KeyD') || this.isDown('ArrowRight')) x += 1;
-    return { x, z };
-  }
+  endFrame() { this.pressed.clear(); }
 }

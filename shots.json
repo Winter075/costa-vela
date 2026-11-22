@@ -1,6 +1,9 @@
-[
-  { "name": "01-cover.jpg", "query": "?shot=cover" },
-  { "name": "02-street.jpg", "query": "?shot=street" },
-  { "name": "03-sunset.jpg", "query": "?shot=sunset" },
-  { "name": "04-garage.jpg", "query": "?shot=garage" }
-]
+{
+  "game": "Costa Vela",
+  "captures": [
+    { "file": "01-cover.jpg", "scene": "Golden hour chase with helicopter, cruisers, objective, response panel and full HUD" },
+    { "file": "02-street.jpg", "scene": "On foot on Beach Boulevard among pedestrians and traffic" },
+    { "file": "03-sunset.jpg", "scene": "Five-star roadblock, weapon wheel and crew dialogue" },
+    { "file": "04-garage.jpg", "scene": "Garage roster, upgrades, respect rank and saved cash" }
+  ]
+}

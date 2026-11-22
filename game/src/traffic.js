@@ -1,184 +1,112 @@
-// Costa Vela traffic: cars that run the grid and pedestrians who use the sidewalks and scatter.
+// Moving traffic, parked cars and pedestrians who get out of the way.
 
 import * as THREE from 'three';
-import { WORLD, VEHICLE_MODELS } from './config.js';
-import { buildCarMesh } from './vehicles.js';
+import { CITY, VEHICLES } from './config.js';
+import { Vehicle } from './vehicles.js';
 import { pick, range } from './random.js';
 
-const SKIN = [0xd9a07a, 0xa86a4a, 0x6f4a33, 0xe8c39a, 0x8d5f45];
-const SHIRTS = [0x3f6fb0, 0xb04f4f, 0x4f8a6b, 0xc09a3f, 0x6a4f9a, 0xd0d0c8];
+const pedestrianColours = [0x6d4f9c, 0xe0b134, 0x2a6ea8, 0x2f8d69, 0xb5573d, 0xd8d3c4];
 
-export function buildPedestrian(random) {
-  const group = new THREE.Group();
-  const shirt = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.38, 0.46, 1.35, 7),
-    new THREE.MeshStandardMaterial({ color: pick(random, SHIRTS), roughness: 0.95 }),
-  );
-  shirt.position.y = 1.35;
-  group.add(shirt);
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.34, 10, 8),
-    new THREE.MeshStandardMaterial({ color: pick(random, SKIN), roughness: 0.9 }),
-  );
-  head.position.y = 2.25;
-  group.add(head);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x30343b, roughness: 1 });
-  const legs = [];
-  for (const z of [-0.2, 0.2]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.0, 0.26), legMat);
-    leg.position.set(0, 0.5, z);
-    group.add(leg);
-    legs.push(leg);
-  }
-  const arms = [];
-  for (const z of [-0.5, 0.5]) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.0, 0.2), shirt.material);
-    arm.position.set(0, 1.4, z);
-    group.add(arm);
-    arms.push(arm);
-  }
-  group.userData = { legs, arms };
-  return group;
+function makePedestrian(rng, x, z) {
+  const g = new THREE.Group();
+  const colour = pick(rng, pedestrianColours);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 1.7, 6), new THREE.MeshLambertMaterial({ color: colour }));
+  body.position.y = 1.0;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 7, 6), new THREE.MeshLambertMaterial({ color: 0xc99368 }));
+  head.position.y = 2.1;
+  g.add(head);
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.8, 0.4), new THREE.MeshLambertMaterial({ color: 0x25252b }));
+  legs.position.y = 0.35;
+  g.add(legs);
+  g.position.set(x, 0, z);
+  return g;
 }
 
 export class TrafficSystem {
-  constructor(scene, random, countCars = 26, countPeds = 34) {
+  constructor(scene, rng) {
     this.scene = scene;
-    this.random = random;
+    this.rng = rng;
     this.cars = [];
-    this.pedestrians = [];
-    this.time = 0;
-    const span = (WORLD.gridMax - WORLD.gridMin) * WORLD.gridStep;
-    this.limit = span / 2 + 40;
+    this.peds = [];
+    this.parked = [];
 
-    for (let i = 0; i < countCars; i++) {
-      const modelIndex = Math.floor(random() * VEHICLE_MODELS.length);
-      const alongX = random() > 0.5;
-      const dir = random() > 0.5 ? 1 : -1;
-      const laneLine = (Math.floor(range(random, WORLD.gridMin, WORLD.gridMax + 1)) * WORLD.gridStep)
-        + dir * (WORLD.roadWidth / 2 - 3.4);
-      const along = range(random, -this.limit, this.limit);
-      const mesh = buildCarMesh(VEHICLE_MODELS[modelIndex].color, VEHICLE_MODELS[modelIndex].kind);
-      const car = {
-        mesh,
-        x: alongX ? along : laneLine,
-        z: alongX ? laneLine : along,
-        heading: alongX ? (dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (dir > 0 ? 0 : Math.PI),
-        speed: range(random, 9, 17),
-        alongX,
-        dir,
-        laneLine,
-        modelIndex,
-        damage: 0,
-        stolen: false,
-      };
-      mesh.position.set(car.x, 0, car.z);
-      mesh.rotation.y = car.heading - Math.PI / 2;
+    for (let i = 0; i < 20; i++) {
+      const spec = pick(rng, VEHICLES);
+      const v = new Vehicle(spec, rng, scene);
+      const axis = rng() > 0.5 ? 'x' : 'z';
+      const line = pick(rng, CITY.grid);
+      const dir = rng() > 0.5 ? 1 : -1;
+      const lane = dir > 0 ? -3.4 : 3.4;
+      const pos = range(rng, -192, 192);
+      if (axis === 'x') v.place(line + lane, pos, dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+      else v.place(pos, line + lane, dir > 0 ? 0 : Math.PI);
+      v.speed = range(rng, 7, 13);
+      v.axis = axis; v.dir = dir; v.line = line;
+      this.cars.push(v);
+    }
+
+    for (let i = 0; i < 12; i++) {
+      const spec = pick(rng, VEHICLES);
+      const v = new Vehicle(spec, rng, scene);
+      const road = pick(rng, CITY.grid);
+      const along = pick(rng, CITY.grid.filter((g) => Math.abs(g - road) > 40));
+      const side = pick(rng, [-9.5, 9.5]);
+      if (rng() > 0.5) v.place(road + side, along + range(rng, -12, 12), pick(rng, [0, Math.PI]));
+      else v.place(along + range(rng, -12, 12), road + side, pick(rng, [Math.PI / 2, -Math.PI / 2]));
+      this.parked.push(v);
+    }
+
+    for (let i = 0; i < 36; i++) {
+      const road = pick(rng, CITY.grid);
+      const along = range(rng, -190, 190);
+      const side = pick(rng, [-11, 11]);
+      const x = rng() > 0.5 ? road + side : along;
+      const z = rng() > 0.5 ? along : road + side;
+      const mesh = makePedestrian(rng, x, z);
       scene.add(mesh);
-      this.cars.push(car);
-    }
-
-    for (let i = 0; i < countPeds; i++) {
-      const mesh = buildPedestrian(random);
-      const alongZ = random() > 0.5;
-      const road = Math.floor(range(random, WORLD.gridMin, WORLD.gridMax + 1)) * WORLD.gridStep;
-      const side = random() > 0.5 ? 1 : -1;
-      const walkLine = road + side * (WORLD.roadWidth / 2 + 2.2);
-      const along = range(random, -this.limit, this.limit);
-      const ped = {
-        mesh,
-        x: alongZ ? walkLine : along,
-        z: alongZ ? along : walkLine,
-        heading: alongZ ? 0 : Math.PI / 2,
-        speed: range(random, 1.4, 2.6),
-        walkLine,
-        alongZ,
-        fleeTimer: 0,
-        gait: random() * 10,
-      };
-      mesh.position.set(ped.x, 0, ped.z);
-      scene.add(mesh);
-      this.pedestrians.push(ped);
+      this.peds.push({ mesh, dir: range(rng, 0, Math.PI * 2), speed: range(rng, 1.1, 2.2), flee: 0 });
     }
   }
 
-  removeCar(car) {
-    this.scene.remove(car.mesh);
-    const index = this.cars.indexOf(car);
-    if (index >= 0) this.cars.splice(index, 1);
-  }
-
-  respawnCar(car) {
-    const alongX = this.random() > 0.5;
-    const dir = this.random() > 0.5 ? 1 : -1;
-    const laneLine = Math.floor(range(this.random, WORLD.gridMin, WORLD.gridMax + 1)) * WORLD.gridStep
-      + dir * (WORLD.roadWidth / 2 - 3.4);
-    car.alongX = alongX;
-    car.dir = dir;
-    car.laneLine = laneLine;
-    car.x = alongX ? range(this.random, -this.limit, this.limit) : laneLine;
-    car.z = alongX ? laneLine : range(this.random, -this.limit, this.limit);
-    car.heading = alongX ? (dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (dir > 0 ? 0 : Math.PI);
-    car.speed = range(this.random, 9, 17);
-    car.damage = 0;
-    car.mesh.visible = true;
-    car.mesh.position.set(car.x, 0, car.z);
-    car.mesh.rotation.y = car.heading + Math.PI;
-  }
-
-  update(dt, player) {
-    this.time += dt;
-    for (const car of this.cars) {
-      const step = car.speed * dt * car.dir;
-      if (car.alongX) car.x += step; else car.z += step;
-      if (car.alongX ? Math.abs(car.x) > this.limit : Math.abs(car.z) > this.limit) this.respawnCar(car);
-      car.mesh.position.set(car.x, 0, car.z);
-      car.mesh.rotation.y = car.heading + Math.PI;
-      for (const w of car.mesh.userData.wheels) w.rotation.y += car.speed * dt * 1.6;
-    }
-
-    const px = player.x;
-    const pz = player.z;
-    for (const ped of this.pedestrians) {
-      const dx = ped.x - px;
-      const dz = ped.z - pz;
-      const dist = Math.hypot(dx, dz);
-      if (dist < 15 && player.speed !== undefined && Math.abs(player.speed) > 6) ped.fleeTimer = 1.6;
-      else if (dist < 9) ped.fleeTimer = 1.0;
-      const fleeing = ped.fleeTimer > 0;
-      if (fleeing) {
-        ped.fleeTimer -= dt;
-        const inv = 1 / Math.max(0.01, dist);
-        ped.x += dx * inv * 7.5 * dt;
-        ped.z += dz * inv * 7.5 * dt;
-        ped.heading = Math.atan2(dx, dz) + Math.PI;
-      } else {
-        const step = ped.speed * dt;
-        if (ped.alongZ) ped.z += step; else ped.x += step;
-        const pos = ped.alongZ ? ped.z : ped.x;
-        if (Math.abs(pos) > this.limit) {
-          if (ped.alongZ) ped.z = -this.limit; else ped.x = -this.limit;
-        }
+  update(dt, playerPos, time) {
+    for (const v of this.cars) {
+      v.drive(dt, { throttle: false, brake: false, steer: 0, handbrake: false });
+      const atIntersection = Math.min(
+        Math.abs(((v.pos.x + 24) % 48) - 24),
+        Math.abs(((v.pos.z + 24) % 48) - 24),
+      ) < 1.6;
+      if (atIntersection && this.rng() < dt * 0.7) {
+        const old = v.axis;
+        v.axis = old === 'x' ? 'z' : 'x';
+        v.line = v.axis === 'x' ? Math.round(v.pos.z / 48) * 48 : Math.round(v.pos.x / 48) * 48;
+        v.dir = this.rng() > 0.5 ? 1 : -1;
+        v.heading = v.axis === 'x' ? (v.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (v.dir > 0 ? 0 : Math.PI);
+        const lane = v.dir > 0 ? -3.4 : 3.4;
+        if (v.axis === 'x') v.pos.z = v.line + lane;
+        else v.pos.x = v.line + lane;
+        v.mesh.rotation.y = v.heading;
       }
-      ped.gait += dt * (fleeing ? 13 : 6);
-      ped.mesh.position.set(ped.x, 0, ped.z);
-      ped.mesh.rotation.y = ped.heading;
-      const swing = Math.sin(ped.gait) * (fleeing ? 0.7 : 0.35);
-      const { legs, arms } = ped.mesh.userData;
-      if (legs[0]) legs[0].rotation.z = swing;
-      if (legs[1]) legs[1].rotation.z = -swing;
-      if (arms[0]) arms[0].rotation.z = -swing;
-      if (arms[1]) arms[1].rotation.z = swing;
+      if (Math.abs(v.pos.x) > 230 || Math.abs(v.pos.z) > 230) {
+        const road = pick(this.rng, CITY.grid);
+        v.place(road, road, v.heading);
+      }
     }
-  }
 
-  nearestCar(x, z, radius = 6) {
-    let best = null;
-    let bestD = radius;
-    for (const car of this.cars) {
-      const d = Math.hypot(car.x - x, car.z - z);
-      if (d < bestD) { best = car; bestD = d; }
+    for (const p of this.peds) {
+      const dx = p.mesh.position.x - playerPos.x;
+      const dz = p.mesh.position.z - playerPos.z;
+      const near = dx * dx + dz * dz < 196;
+      if (near) {
+        p.dir = Math.atan2(dx, dz);
+        p.flee = 1.6;
+      }
+      p.flee = Math.max(0, p.flee - dt);
+      p.mesh.position.x += Math.sin(p.dir) * p.speed * dt * (p.flee ? 2 : 1);
+      p.mesh.position.z += Math.cos(p.dir) * p.speed * dt * (p.flee ? 2 : 1);
+      p.mesh.rotation.y = p.dir;
+      p.mesh.children[0].rotation.z = Math.sin(time * 7 + p.dir) * 0.08;
+      if (Math.abs(p.mesh.position.x) > 215 || Math.abs(p.mesh.position.z) > 215) p.dir += Math.PI;
     }
-    return best;
   }
 }

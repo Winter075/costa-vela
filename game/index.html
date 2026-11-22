@@ -4,17 +4,142 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Costa Vela</title>
-<link rel="icon" href="data:,">
-<style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c121c; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-</style>
 <script type="importmap">
-{"imports":{"three":"./vendor/three.min.js"}}
+{ "imports": { "three": "./vendor/three.min.js" } }
 </script>
+<style>
+  :root {
+    --gold: #f2c14e;
+    --ink: #0b111c;
+    --paper: #e8eef5;
+    --dim: #9aacbe;
+    --line: rgba(242, 193, 78, .42);
+    --panel: rgba(9, 14, 24, .84);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #201619; }
+  body { color: var(--paper); font-family: "Trebuchet MS", Arial, sans-serif; user-select: none; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  .panel { position: absolute; background: var(--panel); border: 1px solid rgba(255,255,255,.08); border-radius: 3px; box-shadow: 0 8px 26px rgba(0,0,0,.28); padding: 10px 12px; }
+  .eyebrow { font-size: 10px; letter-spacing: 2.2px; color: var(--dim); text-transform: uppercase; }
+  .gold { color: var(--gold); }
+  #objective { left: 16px; top: 16px; width: 302px; }
+  #objective .title { font-size: 17px; font-weight: bold; letter-spacing: .8px; color: var(--gold); margin: 3px 0 4px; text-transform: uppercase; }
+  #objective .task { font-size: 13px; line-height: 1.35; }
+  #objective .next { font-size: 11px; color: var(--dim); margin-top: 6px; }
+  #response { left: 16px; top: 126px; width: 302px; padding-bottom: 6px; }
+  #response .row { display: flex; gap: 6px; font-size: 11px; line-height: 1.7; }
+  #response .row .unit { flex: 1; color: var(--paper); }
+  #response .row .status { width: 92px; color: #f08a83; text-transform: uppercase; font-size: 10px; }
+  #response .row .dist { width: 30px; text-align: right; color: var(--dim); }
+  #response .row.calm .status { color: #73d6a2; }
+  #wanted { right: 16px; top: 16px; width: 300px; height: 78px; text-align: right; }
+  #stars { font-size: 22px; letter-spacing: 5px; line-height: 1; color: rgba(255,255,255,.24); }
+  #stars .on { color: var(--gold); }
+  #cash { font-size: 22px; font-weight: bold; color: #7fe3b0; margin-top: 2px; }
+  #rank { font-size: 10px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; }
+  #weapons { right: 16px; top: 106px; width: 190px; }
+  #weapons .slot { display: flex; gap: 8px; font-size: 11px; line-height: 1.65; color: var(--dim); }
+  #weapons .slot.active { color: var(--gold); }
+  #weapons .slot .num { width: 14px; color: #d8e4f0; }
+  #crew { right: 16px; top: 316px; width: 226px; padding-bottom: 7px; }
+  #crew .row { display: flex; align-items: center; gap: 8px; font-size: 11px; line-height: 1.8; }
+  #crew .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  #crew .name { width: 42px; font-weight: bold; }
+  #crew .role { flex: 1; color: var(--dim); }
+  #crew .state { color: #73d6a2; font-size: 10px; }
+  #minimap { left: 16px; bottom: 16px; width: 200px; height: 200px; padding: 0; overflow: hidden; }
+  #minimap canvas { width: 100%; height: 100%; display: block; }
+  #subtitle { left: 50%; bottom: 16px; transform: translateX(-50%); width: 600px; text-align: center; font-size: 12px; line-height: 38px; height: 46px; padding: 3px 12px; }
+  #speedo { right: 16px; bottom: 16px; width: 270px; height: 78px; text-align: right; }
+  #speedValue { font-size: 34px; font-weight: bold; line-height: 1; }
+  #speedValue small { font-size: 10px; font-weight: normal; color: var(--dim); margin-left: 4px; }
+  #healthBar { height: 3px; background: rgba(255,255,255,.14); margin: 6px 0 5px; }
+  #healthFill { height: 100%; width: 100%; background: #6fd7a7; transition: width .2s; }
+  #radio { font-size: 10px; letter-spacing: .8px; color: var(--gold); }
+  #wheel { position: absolute; left: 50%; top: 50%; width: 340px; height: 340px; margin: -170px 0 0 -170px; display: none; }
+  #wheel .ring { position: absolute; width: 92px; height: 30px; left: 124px; top: 155px; background: var(--panel); border: 1px solid var(--line); text-align: center; font-size: 10px; line-height: 28px; color: var(--dim); }
+  #wheel .hub { position: absolute; left: 121px; top: 148px; width: 98px; height: 46px; border-radius: 50%; border: 2px solid var(--gold); background: var(--ink); text-align: center; line-height: 42px; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+  #wheel.open { display: block; }
+  #wheel.on .ring { color: var(--gold); border-color: var(--gold); }
+  #garage { position: absolute; left: 50%; top: 50%; width: 760px; height: 538px; margin: -269px 0 0 -380px; background: rgba(8,13,22,.94); border: 1px solid var(--line); padding: 20px 26px; display: none; pointer-events: auto; }
+  #garage.open { display: block; }
+  #garage h1 { font-size: 26px; letter-spacing: 3px; color: var(--gold); margin: 0; }
+  #garage .sub { font-size: 10px; letter-spacing: 2px; color: var(--dim); margin-bottom: 14px; }
+  #garage .cols { display: flex; gap: 26px; }
+  #garage .col { flex: 1; }
+  #garage h2 { font-size: 11px; letter-spacing: 2px; color: #7fd3e6; margin: 6px 0; }
+  #roster div, #upgradeList div, #radioList div { font-size: 11px; line-height: 2; border-bottom: 1px solid rgba(255,255,255,.07); display: flex; }
+  #roster span:last-child, #upgradeList span:last-child { margin-left: auto; color: #7fe3b0; }
+  #garage button { pointer-events: auto; background: rgba(242,193,78,.08); color: var(--gold); border: 1px solid var(--line); padding: 7px 16px; margin: 12px 8px 0 0; font: inherit; font-size: 11px; letter-spacing: 1px; cursor: pointer; }
+  #garage button:hover { background: rgba(242,193,78,.2); }
+  #start { position: absolute; inset: 0; background: linear-gradient(rgba(8,12,20,.42), rgba(8,12,20,.86)); display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; }
+  #start.hidden { display: none; }
+  #start h1 { font-size: 58px; letter-spacing: 14px; margin: 0; color: var(--gold); text-shadow: 0 4px 26px rgba(0,0,0,.7); }
+  #start p { letter-spacing: 4px; font-size: 12px; color: var(--dim); margin: 6px 0 34px; }
+  #start button { pointer-events: auto; background: rgba(10,16,26,.86); color: var(--paper); border: 1px solid var(--line); padding: 12px 28px; margin: 6px; font: inherit; font-size: 13px; letter-spacing: 3px; cursor: pointer; }
+  #start button:hover { color: var(--gold); }
+  #flash { position: absolute; inset: 0; background: rgba(255,110,60,.16); opacity: 0; transition: opacity .12s; }
+  #help { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); font-size: 10px; letter-spacing: 1.5px; color: rgba(255,255,255,.55); }
+</style>
 </head>
 <body>
-<p id="status" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Costa Vela open-world crime game</p>
+<canvas id="scene"></canvas>
+<div id="hud">
+  <div id="objective" class="panel">
+    <div class="eyebrow">Current job <span id="missionCount" class="gold" style="float:right">01 / 08</span></div>
+    <div id="missionTitle" class="title">A RIDE ALONG THE BOULEVARD</div>
+    <div id="missionTask" class="task">Reach the boulevard drop point</div>
+    <div id="missionNext" class="next">NEXT: Collect the keys from Mara</div>
+  </div>
+  <div id="response" class="panel">
+    <div class="eyebrow" style="margin-bottom:4px">Police response</div>
+    <div id="responseRows"></div>
+  </div>
+  <div id="wanted" class="panel">
+    <div id="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+    <div id="cash">$1,250</div>
+    <div id="rank">NEW FACE</div>
+  </div>
+  <div id="weapons" class="panel"></div>
+  <div id="crew" class="panel"></div>
+  <div id="minimap" class="panel"><canvas id="mapCanvas" width="200" height="200"></canvas></div>
+  <div id="subtitle" class="panel"></div>
+  <div id="speedo" class="panel">
+    <div id="speedValue">0<small>KM/H</small></div>
+    <div id="healthBar"><div id="healthFill"></div></div>
+    <div id="radio">SUNSET FM 104.2 | Golden Hour Drive</div>
+  </div>
+  <div id="wheel">
+    <div class="hub">COSTA VELA</div>
+  </div>
+  <div id="garage">
+    <h1>THE GARAGE</h1>
+    <div class="sub">COSTA VELA MOTOR WORKS</div>
+    <div class="cols">
+      <div class="col"><h2>VEHICLE ROSTER</h2><div id="roster"></div></div>
+      <div class="col">
+        <h2>UPGRADES</h2><div id="upgradeList"></div>
+        <h2 style="margin-top:16px">RESPECT</h2>
+        <div id="respectText" style="font-size:11px;line-height:1.8"></div>
+        <h2 style="margin-top:16px">RADIO</h2><div id="radioList"></div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between">
+      <div><button id="saveBtn">SAVE GAME</button><button id="closeGarage">CLOSE</button></div>
+      <div id="garageCash" style="color:#7fe3b0;font-size:15px;padding-top:14px"></div>
+    </div>
+  </div>
+  <div id="help">WASD DRIVE &middot; SPACE HANDBRAKE &middot; E ENTER/EXIT &middot; 1-6 WEAPONS &middot; Q WHEEL &middot; G GARAGE &middot; MOUSE DRAG ORBIT</div>
+  <div id="flash"></div>
+  <div id="start">
+    <h1>COSTA VELA</h1>
+    <p>AN OPEN WORLD ON THE SUNSET COAST</p>
+    <button id="newGame">NEW GAME</button>
+    <button id="continueGame">CONTINUE</button>
+  </div>
+</div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

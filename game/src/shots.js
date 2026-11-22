@@ -1,79 +1,118 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// Costa Vela screenshot presets. Each mode arranges a real, running game into a
+// frame that shows several systems at once; nothing here edits the captured image.
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
+export const SHOT_PRESETS = {
+  cover: {
+    weather: 'golden', wanted: 4, missionIndex: 3,
+    x: -192, z: -128, heading: 0, inCar: true, vehicleModel: 0,
+    wheel: false, garage: false, explosion: false, extraUnits: 2,
+    orbitYaw: 0, orbitPitch: 0.26, cash: 4820, respect: 3100,
+  },
+  street: {
+    weather: 'day', wanted: 0, missionIndex: 0,
+    x: -256, z: -64, heading: 0, inCar: false, vehicleModel: 3,
+    wheel: false, garage: false, explosion: false, extraUnits: 0,
+    orbitYaw: 0, orbitPitch: 0.22, cash: 1250, respect: 0,
+  },
+  sunset: {
+    weather: 'sunset', wanted: 5, missionIndex: 6,
+    x: 128, z: 256, heading: -0.4, inCar: false, vehicleModel: 4,
+    wheel: true, garage: false, explosion: true, extraUnits: 1,
+    orbitYaw: 0.2, orbitPitch: 0.26, cash: 6140, respect: 5200,
+  },
+  garage: {
+    weather: 'golden', wanted: 0, missionIndex: 4,
+    x: 0, z: 0, heading: 0, inCar: false, vehicleModel: 0,
+    wheel: false, garage: true, explosion: false, extraUnits: 0,
+    orbitYaw: 0.6, orbitPitch: 0.25, cash: 9820, respect: 6400,
+  },
+};
 
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
-    }
-  }
-  return Infinity;
+export function shotNameFromQuery(query) {
+  const name = new URLSearchParams(query).get('shot');
+  return name && SHOT_PRESETS[name] ? name : null;
 }
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
-  }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
-  }
-  return best;
-}
+export function applyShot(name, ctx) {
+  const preset = SHOT_PRESETS[name];
+  if (!preset) return null;
+  const { player, police, missions, combat, progress, hud, cameraRig, traffic } = ctx;
 
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
+  progress.cash = preset.cash;
+  progress.respect = preset.respect;
+  if (name === 'garage') {
+    progress.ownedVehicles = [0, 1, 2, 3, 4, 5, 6];
+    progress.upgrades = { engine: 2, armour: 2, brakes: 1 };
   }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
+
+  player.x = preset.x;
+  player.z = preset.z;
+  player.heading = preset.heading;
+  player.inCar = preset.inCar;
+  player.vehicleModelIndex = preset.vehicleModel;
+  player.speed = preset.inCar ? 26 : 0;
+
+  missions.index = preset.missionIndex;
+  missions.setDialogue(missions.current()?.dialogue ?? 'MARA: Stay sharp.', 999);
+  missions.syncMarker();
+
+  police.setWanted(preset.wanted);
+  police.ensureUnits(player);
+  for (let i = 0; i < preset.extraUnits; i++) police.spawnUnit('CRUISER', player);
+
+  // Put the helicopter in front of the camera so its spotlight reads in the frame.
+  const heli = police.units.find((u) => u.type === 'HELI');
+  if (heli) {
+    heli.orbit = 0;
+    heli.x = player.x + Math.sin(player.heading) * 60;
+    heli.z = player.z + Math.cos(player.heading) * 60;
+    heli.y = 20;
+    heli.mesh.position.set(heli.x, heli.y, heli.z);
   }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+
+  if (name === 'cover' || name === 'sunset') {
+    const ground = police.units.filter((u) => u.y === 0 && u.type !== 'ROADBLOCK');
+    ground.forEach((unit, i) => {
+      unit.speed = 7;
+      unit.x = player.x + (i % 2 === 0 ? -3.5 : 3.5);
+      unit.z = player.z + 26 + i * 14;
+      unit.heading = Math.PI;
+      unit.mesh.position.set(unit.x, 0, unit.z);
+      unit.mesh.rotation.y = unit.heading - Math.PI / 2;
+    });
+  }
+
+  if (name === 'street' && traffic) {
+    const peds = traffic.pedestrians;
+    const spots = [[-8, 12], [8, 16], [-14, 22], [14, 24], [-3, 10], [5, 28]];
+    peds.forEach((ped, i) => {
+      if (i >= spots.length) return;
+      ped.x = player.x + spots[i][0];
+      ped.z = player.z + spots[i][1];
+      ped.walkLine = ped.alongZ ? ped.x : ped.z;
+      ped.fleeTimer = 0;
+      ped.mesh.position.set(ped.x, 0, ped.z);
+    });
+    const cars = traffic.cars;
+    [[12, -8], [-18, 6], [22, 14]].forEach(([dx, dz], i) => {
+      if (!cars[i]) return;
+      cars[i].x = player.x + dx;
+      cars[i].z = player.z + dz;
+      cars[i].mesh.position.set(cars[i].x, 0, cars[i].z);
+    });
+  }
+
+  if (preset.explosion) {
+    combat.spawnExplosion(player.x + 16, player.z + 22, 0.85);
+    combat.spawnExplosion(player.x - 20, player.z + 36, 0.55);
+  }
+  combat.toggleWheel(preset.wheel);
+  hud.setWheel(preset.wheel, combat.slot);
+  if (preset.garage) hud.showGarage(progress, ctx.garageHandlers);
+
+  if (cameraRig) {
+    cameraRig.yaw = preset.orbitYaw;
+    cameraRig.pitch = preset.orbitPitch;
+  }
+  return preset;
 }

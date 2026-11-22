@@ -1,53 +1,91 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+// Costa Vela keyboard and mouse input. Held keys, one-shot presses and orbit drag live here.
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+const BLOCKED = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+export class InputController {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.held = new Set();
+    this.pressed = new Set();
+    this.fireHeld = false;
+    this.firePressed = false;
+    this.dragDX = 0;
+    this.dragDY = 0;
+    this.dragging = false;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.enabled = true;
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
+    window.addEventListener('keydown', (event) => {
+      if (BLOCKED.has(event.code)) event.preventDefault();
+      if (!event.repeat) this.pressed.add(event.code);
+      this.held.add(event.code);
+    });
+    window.addEventListener('keyup', (event) => this.held.delete(event.code));
+    window.addEventListener('blur', () => { this.held.clear(); this.dragging = false; });
 
-  window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
-  });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
-  });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
+    canvas.addEventListener('mousedown', (event) => {
+      if (event.button === 0) {
+        this.fireHeld = true;
+        this.firePressed = true;
+        this.dragging = true;
+        this.lastX = event.clientX;
+        this.lastY = event.clientY;
+      } else if (event.button === 2) {
+        this.dragging = true;
+        this.lastX = event.clientX;
+        this.lastY = event.clientY;
+      }
+    });
+    window.addEventListener('mouseup', (event) => {
+      this.fireHeld = false;
+      this.dragging = false;
+      if (event.button === 2) this.dragging = false;
+    });
+    window.addEventListener('mousemove', (event) => {
+      if (!this.dragging) return;
+      this.dragDX += event.clientX - this.lastX;
+      this.dragDY += event.clientY - this.lastY;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+    });
+    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
 
-  return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
-    },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
-    },
-  };
+  isDown(code) { return this.held.has(code); }
+
+  consume(code) {
+    if (!this.pressed.has(code)) return false;
+    this.pressed.delete(code);
+    return true;
+  }
+
+  consumeFire() {
+    const value = this.firePressed;
+    this.firePressed = false;
+    return value;
+  }
+
+  takeOrbit() {
+    const delta = { x: this.dragDX, y: this.dragDY };
+    this.dragDX = 0;
+    this.dragDY = 0;
+    return delta;
+  }
+
+  endFrame() {
+    this.pressed.clear();
+    this.firePressed = false;
+  }
+
+  // Movement axes used by both driving and on-foot mode.
+  axes() {
+    let x = 0;
+    let z = 0;
+    if (this.isDown('KeyW') || this.isDown('ArrowUp')) z -= 1;
+    if (this.isDown('KeyS') || this.isDown('ArrowDown')) z += 1;
+    if (this.isDown('KeyA') || this.isDown('ArrowLeft')) x -= 1;
+    if (this.isDown('KeyD') || this.isDown('ArrowRight')) x += 1;
+    return { x, z };
+  }
 }

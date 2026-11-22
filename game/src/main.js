@@ -501,6 +501,68 @@ continueButton.disabled = !loadSave();
 document.getElementById('new-game').addEventListener('click', () => startGame(false));
 continueButton.addEventListener('click', () => startGame(true));
 
+const shotParam = new URLSearchParams(window.location.search).get('shot');
+const shotNumber = shotParam === null ? 0 : Number(shotParam);
+
+function placeShotCar(spec, x, z, yaw) {
+  const car = makeVehicle(spec, x, z, yaw);
+  scene.add(car.mesh);
+  placeVehicle(car);
+  world.parked.push(car);
+  enterVehicle(car, true);
+  return car;
+}
+
+function applyShotSetup() {
+  if (!shotNumber) return;
+  document.getElementById('start').classList.add('hidden');
+  state.mode = 'play';
+  orbitYaw = 0;
+  orbitPitch = 0.25;
+
+  if (shotNumber === 1) {
+    const car = placeShotCar(VEHICLES[0], 0, 80, Math.PI);
+    car.speed = 24;
+    state.speed = 24;
+    setWanted(5);
+    hud.say('Mara: Keep moving. Air One is on us.');
+  } else if (shotNumber === 2) {
+    state.x = 0;
+    state.z = 0;
+    state.yaw = 0.4;
+    state.onFoot = true;
+    playerMesh.position.set(state.x, 0, state.z);
+    playerMesh.visible = true;
+    hud.say('Ivo: The boulevard is busy. Stay close.');
+  } else if (shotNumber === 3) {
+    state.x = 152;
+    state.z = 40;
+    state.yaw = -0.8;
+    state.onFoot = true;
+    playerMesh.position.set(state.x, 0, state.z);
+    playerMesh.visible = true;
+    setWanted(5);
+    effects.fire(new THREE.Vector3(160, 0, 48), 18);
+    flags.wreckBurned = true;
+    state.showWheel = 30;
+    hud.say('Mara: Five stars. Keep moving, do not stop.');
+  } else if (shotNumber === 4) {
+    state.x = -120;
+    state.z = -80;
+    state.cash = 6400;
+    state.respect = 5200;
+    state.upgrades.engine = true;
+    state.upgrades.brakes = true;
+    state.mode = 'garage';
+    hud.setGarageVisible(true);
+  }
+
+  camera.position.set(state.x - Math.sin(state.yaw) * 12, 7, state.z - Math.cos(state.yaw) * 12);
+  camera.lookAt(state.x, 1.4, state.z);
+}
+
+applyShotSetup();
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();

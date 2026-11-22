@@ -25,7 +25,7 @@ WASD drive or walk · Space handbrake or nitro · E enter or exit a car · click
 node serve.ts
 ```
 
-Then open http://localhost:8080 in a desktop browser.
+Then open http://localhost:8080 in a desktop browser. Add `?shot=1`, `?shot=2`, `?shot=3` or `?shot=4` to replay the four screenshot setups.
 
 ---
 

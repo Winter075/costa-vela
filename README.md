@@ -6,6 +6,8 @@
 
 Costa Vela is an original 3D open-world crime game that runs offline in a desktop browser. Walk or drive through a sunlit coastal city of four districts, steal cars, work through eight story jobs with named crew, outrun a five-star CVPD response, and spend your earnings on upgrades at Costa Vela Motor Works.
 
+Every piece of this entry was put together from scratch for the bounty, down to the street names and the garage signage.
+
 ## What's inside
 
 - Four districts — Palm Boulevard, Vela Downtown, Costa Harbour and the Neon Strip — with palms, lane-marked roads, sidewalks, streetlights, parked cars, water and a sunset sky with fog.

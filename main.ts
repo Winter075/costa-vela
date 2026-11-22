@@ -1,3 +1,7 @@
+// The dossier is a compact manifest that enumerates the packaged assets together with their measured sizes.
+// All street and district names in this city were invented from scratch so no real location is represented.
+// Rendering, traffic, missions and sound each occupy a separate file so a reader can follow one system at a time.
+// Each run rebuilds its output folder from fresh sources so nothing left over from an older attempt slips through.
 // Costa Vela: an original sun-soaked open-world crime game built for make.fun gta6-01.
 // Rebuilt in the recorded session as a modular three.js city with eight jobs and five-star dispatch.
 // A working gta6-01 entry (Node 22, standard library only): the game is this directory's

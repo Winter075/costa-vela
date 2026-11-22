@@ -1,79 +1,94 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// Short-lived visuals: tracers, impact sparks, muzzle flashes, fire and smoke.
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
+import * as THREE from 'three';
 
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
+export function createEffects(scene) {
+  const live = [];
+
+  function keep(object, life, animate) {
+    scene.add(object);
+    live.push({ object, life, age: 0, animate });
+  }
+
+  function tracer(from, to, color = 0xffd479) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([from.clone(), to.clone()]);
+    const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1 }));
+    keep(line, 0.14, (effect) => {
+      effect.object.material.opacity = 1 - effect.age / effect.life;
+    });
+  }
+
+  function burst(at, color = 0xffc46b, count = 6) {
+    const shape = new THREE.SphereGeometry(0.16, 5, 4);
+    for (let i = 0; i < count; i += 1) {
+      const piece = new THREE.Mesh(shape, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+      piece.position.copy(at);
+      const angle = (i / count) * Math.PI * 2;
+      const drift = new THREE.Vector3(Math.cos(angle) * 4, 2 + (i % 3), Math.sin(angle) * 4);
+      keep(piece, 0.42, (effect) => {
+        effect.object.position.addScaledVector(drift, 0.016);
+        effect.object.material.opacity = 1 - effect.age / effect.life;
+      });
     }
   }
-  return Infinity;
-}
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
+  function flash(at) {
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.36, 6, 5),
+      new THREE.MeshBasicMaterial({ color: 0xffdd96, transparent: true, opacity: 0.95 }),
+    );
+    glow.position.copy(at);
+    keep(glow, 0.09, (effect) => {
+      effect.object.scale.setScalar(1 + effect.age * 12);
+      effect.object.material.opacity = 1 - effect.age / effect.life;
+    });
   }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
+
+  function fire(at, life = 12) {
+    const group = new THREE.Group();
+    group.position.copy(at);
+    for (let i = 0; i < 5; i += 1) {
+      const flame = new THREE.Mesh(
+        new THREE.ConeGeometry(0.55 + i * 0.07, 2.6, 6),
+        new THREE.MeshBasicMaterial({ color: 0xff8b2e, transparent: true, opacity: 0.85 }),
+      );
+      flame.position.set((i - 2) * 0.3, 1.5 + (i % 2) * 0.4, ((i % 3) - 1) * 0.3);
+      group.add(flame);
+    }
+    for (let i = 0; i < 3; i += 1) {
+      const smoke = new THREE.Mesh(
+        new THREE.SphereGeometry(1 + i * 0.35, 7, 5),
+        new THREE.MeshBasicMaterial({ color: 0x3b3633, transparent: true, opacity: 0.5 }),
+      );
+      smoke.position.set((i - 1) * 0.5, 3.5 + i * 1.2, 0);
+      group.add(smoke);
+    }
+    keep(group, life, (effect) => {
+      const phase = effect.age * 8;
+      effect.object.children.forEach((part, index) => {
+        if (index < 5) {
+          part.scale.y = 0.75 + Math.sin(phase + index) * 0.28;
+          part.material.opacity = 0.85 - effect.age / (effect.life * 1.6);
+        } else {
+          part.position.y += 0.012;
+          part.material.opacity = Math.max(0, 0.5 - effect.age / (effect.life * 1.5));
+        }
+      });
+    });
+    return group;
+  }
+
+  function update(dt) {
+    for (let i = live.length - 1; i >= 0; i -= 1) {
+      const effect = live[i];
+      effect.age += dt;
+      effect.animate(effect);
+      if (effect.age >= effect.life) {
+        scene.remove(effect.object);
+        live.splice(i, 1);
+      }
     }
   }
-  return best;
-}
 
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
-  }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  return { tracer, burst, flash, fire, update };
 }

@@ -1,53 +1,72 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+// Keyboard and pointer state. The loop reads this once per frame.
+const held = new Set();
+const tapped = new Set();
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+export const pointer = {
+  x: 0,
+  y: 0,
+  left: false,
+  right: false,
+  dragging: false,
+  dx: 0,
+  dy: 0,
+};
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+const swallow = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']);
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
-
+export function initInput(canvas) {
   window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
+    if (!held.has(event.code)) tapped.add(event.code);
+    held.add(event.code);
+    if (swallow.has(event.code)) event.preventDefault();
   });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
-  });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
+  window.addEventListener('keyup', (event) => held.delete(event.code));
   window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
+    held.clear();
+    pointer.left = false;
+    pointer.right = false;
+    pointer.dragging = false;
   });
 
-  return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
-    },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
-    },
-  };
+  canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+  canvas.addEventListener('mousedown', (event) => {
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+    if (event.button === 0) pointer.left = true;
+    if (event.button === 2) {
+      pointer.right = true;
+      pointer.dragging = true;
+      pointer.dx = 0;
+      pointer.dy = 0;
+    }
+  });
+  window.addEventListener('mouseup', (event) => {
+    if (event.button === 0) pointer.left = false;
+    if (event.button === 2) {
+      pointer.right = false;
+      pointer.dragging = false;
+    }
+  });
+  window.addEventListener('mousemove', (event) => {
+    if (pointer.dragging) {
+      pointer.dx += event.clientX - pointer.x;
+      pointer.dy += event.clientY - pointer.y;
+    }
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+  });
+}
+
+export function isDown(code) {
+  return held.has(code);
+}
+
+export function wasPressed(code) {
+  return tapped.has(code);
+}
+
+export function endFrame() {
+  tapped.clear();
+  pointer.dx = 0;
+  pointer.dy = 0;
 }

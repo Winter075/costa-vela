@@ -1,3 +1,5 @@
+// Costa Vela: this entry packages the original open-world crime game built in game/.
+// Gameplay modules live in game/src; this file only hands the finished game to make.fun.
 // A working gta6-01 entry (Node 22, standard library only): the game is this directory's
 // game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
 // modules, no library and no network request), and the program hands it in. It copies game/ and

@@ -1,53 +1,70 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+// input.js — keyboard, mouse-drag orbit and click-to-fire, kept separate from game rules.
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+export class InputController {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.down = new Set();
+    this.justPressed = new Set();
+    this.orbitX = 0;
+    this.orbitY = 0;
+    this.fireRequested = false;
+    this.dragging = false;
+    this.lastX = 0;
+    this.lastY = 0;
+    this.enabled = true;
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+    window.addEventListener('keydown', (event) => {
+      if (!this.enabled) return;
+      if (!this.down.has(event.code)) this.justPressed.add(event.code);
+      this.down.add(event.code);
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+    });
+    window.addEventListener('keyup', (event) => this.down.delete(event.code));
+    window.addEventListener('blur', () => { this.down.clear(); this.dragging = false; });
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
+    canvas.addEventListener('pointerdown', (event) => {
+      if (!this.enabled || event.button !== 0) return;
+      this.dragging = true;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!this.dragging || !this.enabled) return;
+      this.orbitX += event.clientX - this.lastX;
+      this.orbitY += event.clientY - this.lastY;
+      this.lastX = event.clientX;
+      this.lastY = event.clientY;
+    });
+    canvas.addEventListener('pointerup', (event) => {
+      if (!this.dragging) return;
+      const moved = Math.abs(event.clientX - this.lastX) + Math.abs(event.clientY - this.lastY);
+      if (moved < 6 && this.enabled) this.fireRequested = true;
+      this.dragging = false;
+      canvas.releasePointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
 
-  window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
-  });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
-  });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
-  });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
+  isDown(code) { return this.down.has(code); }
+  wasPressed(code) { return this.justPressed.has(code); }
 
-  return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
-    },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
-    },
-  };
+  consumeFire() {
+    const value = this.fireRequested || this.down.has('ControlLeft');
+    this.fireRequested = false;
+    return value;
+  }
+
+  consumeOrbit() {
+    const value = { x: this.orbitX, y: this.orbitY };
+    this.orbitX = 0;
+    this.orbitY = 0;
+    if (this.isDown('ArrowLeft')) value.x -= 14;
+    if (this.isDown('ArrowRight')) value.x += 14;
+    if (this.isDown('ArrowUp')) value.y -= 10;
+    if (this.isDown('ArrowDown')) value.y += 10;
+    return value;
+  }
+
+  endFrame() { this.justPressed.clear(); }
 }

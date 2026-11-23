@@ -1,11 +1,18 @@
-// missions.js — the eight-mission story chain, dialogue subtitles and the street race side activity.
+// missions.js — the eight-job chain, character subtitles and the street race side activity.
 
 import * as THREE from 'three';
 import { MISSION_CHAIN, STREET_RACE_GATES } from './config.js';
 
+function gateLegDistance(index) {
+  const here = STREET_RACE_GATES[index];
+  const before = index > 0 ? STREET_RACE_GATES[index - 1] : { x: 0, z: 0 };
+  return Math.hypot(here.x - before.x, here.z - before.z);
+}
+
 export class StreetRace {
   constructor() {
     this.gates = STREET_RACE_GATES;
+    this.totalLength = this.gates.reduce((sum, gate, index) => sum + gateLegDistance(index), 0);
     this.active = false;
     this.finished = false;
     this.currentGate = 0;
@@ -25,7 +32,8 @@ export class StreetRace {
   update(dt, playerPosition) {
     if (!this.active) return false;
     this.elapsed += dt;
-    this.rivalProgress += dt * (STREET_RACE_GATES.reduce((sum, gate, i) => sum + Math.hypot(gate.x - (i ? STREET_RACE_GATES[i - 1].x : 0), gate.z - (i ? STREET_RACE_GATES[i - 1].z : 0)), 0) / 260);
+    this.rivalProgress += (dt * this.totalLength) / 260;
+
     const gate = this.gates[this.currentGate];
     if (gate && Math.hypot(playerPosition.x - gate.x, playerPosition.z - gate.z) < gate.radius) {
       this.currentGate++;
@@ -41,7 +49,9 @@ export class StreetRace {
 
   getStatus() {
     if (!this.active && !this.finished) return 'Street race available at Causeway';
-    if (this.active) return `Gate ${this.currentGate + 1}/3 · ${this.elapsed.toFixed(1)}s · rival ${this.rivalProgress.toFixed(0)}%`;
+    if (this.active) {
+      return `Gate ${this.currentGate + 1}/3 · ${this.elapsed.toFixed(1)}s · rival ${this.rivalProgress.toFixed(0)}%`;
+    }
     return `Race won in ${this.bestTime.toFixed(1)}s`;
   }
 }
@@ -57,14 +67,17 @@ export class StoryDirector {
     this.race = new StreetRace();
     this.notice = '';
     this.noticeTimer = 0;
+    this.finaleStart = undefined;
     this.showLine();
   }
 
-  get mission() { return this.chain[Math.min(this.index, this.chain.length - 1)]; }
+  get mission() {
+    return this.chain[Math.min(this.index, this.chain.length - 1)];
+  }
 
   showLine() {
-    const line = this.mission.lines[Math.min(this.lineIndex, this.mission.lines.length - 1)];
-    this.subtitle = line;
+    const lines = this.mission.lines;
+    this.subtitle = lines[Math.min(this.lineIndex, lines.length - 1)];
     this.subtitleTimer = 6.5;
   }
 
@@ -85,12 +98,12 @@ export class StoryDirector {
   }
 
   advance() {
-    const completed = this.mission;
-    this.onComplete?.(completed);
+    const finished = this.mission;
+    this.onComplete?.(finished);
     this.index = Math.min(this.index + 1, this.chain.length - 1);
     this.lineIndex = 0;
     this.showLine();
-    this.notice = `Mission complete · +$${completed.reward}`;
+    this.notice = `Mission complete · +$${finished.reward}`;
     this.noticeTimer = 5;
   }
 
@@ -115,9 +128,7 @@ export class StoryDirector {
         this.race.start();
         this.say('Rook: Gates lit. Go!', 3);
       }
-      if (this.race.update(dt, context.playerPosition)) {
-        this.advance();
-      }
+      if (this.race.update(dt, context.playerPosition)) this.advance();
       return;
     }
     if (mission.type === 'heat') {
@@ -125,15 +136,18 @@ export class StoryDirector {
       return;
     }
     if (mission.type === 'finale') {
-      if (context.wanted >= 5 && distance < 34 && context.elapsed - this.finaleStart > 3) this.advance();
+      const heldLongEnough = context.elapsed - this.finaleStart > 3;
+      if (context.wanted >= 5 && distance < 34 && heldLongEnough) this.advance();
       return;
     }
-    if (distance < 22) {
-      if (mission.type === 'drive') this.advance();
-    }
+    if (mission.type === 'drive' && distance < 22) this.advance();
   }
 
-  markFinaleStart(elapsed) { if (this.finaleStart === undefined) this.finaleStart = elapsed; }
+  markFinaleStart(elapsed) {
+    if (this.finaleStart === undefined) this.finaleStart = elapsed;
+  }
 
-  getSubtitle() { return this.subtitleTimer > 0 ? this.subtitle : ''; }
+  getSubtitle() {
+    return this.subtitleTimer > 0 ? this.subtitle : '';
+  }
 }

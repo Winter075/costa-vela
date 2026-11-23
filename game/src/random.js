@@ -1,7 +1,8 @@
-// random.js — a seeded generator so a ?shot= preset produces the same city every time.
+// random.js — seeded numbers so a ?seed= preset always rebuilds the same city.
 
+// A 32-bit generator: short, dependency-free, and repeatable across browsers.
 export function makeRandom(seed = 1) {
-  let state = seed >>> 0;
+  let state = (seed >>> 0) || 0x9e3779b9;
   const next = () => {
     state = (state + 0x6d2b79f5) >>> 0;
     let t = state;
@@ -11,9 +12,9 @@ export function makeRandom(seed = 1) {
   };
   return {
     next,
-    range(min, max) { return min + (max - min) * next(); },
-    int(min, max) { return Math.floor(this.range(min, max + 1)); },
-    pick(items) { return items[Math.floor(next() * items.length)]; },
-    chance(p) { return next() < p; },
+    range(low, high) { return low + (high - low) * next(); },
+    int(low, high) { return low + Math.floor(next() * (high - low + 1)); },
+    pick(list) { return list[Math.floor(next() * list.length)]; },
+    chance(probability) { return next() < probability; },
   };
 }

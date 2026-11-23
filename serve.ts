@@ -1,19 +1,19 @@
-// A tiny static server for game/ (Node 22, standard library only), so an entry can be played
-// locally without a build step: `node serve.ts` serves game/ on http://localhost:8080.
-// It sends the MIME types a browser game needs, refuses any path outside game/, and otherwise
-// does nothing clever: this is a development convenience, not a web server for the internet.
+// serve.ts — a tiny Node 22 static server for game/, used for local play and captures.
+// It refuses paths outside game/ and sends the MIME types a browser game needs.
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('./game', import.meta.url)));
-const args = process.argv.slice(2);
-const portIndex = args.indexOf('--port');
-const requested = portIndex === -1 ? 8080 : Number(args[portIndex + 1]);
-const port = Number.isInteger(requested) && requested > 0 && requested < 65536 ? requested : 8080;
+const argv = process.argv.slice(2);
+const portFlag = argv.indexOf('--port');
+const requestedPort = portFlag === -1 ? 8080 : Number(argv[portFlag + 1]);
+const port = Number.isInteger(requestedPort) && requestedPort > 0 && requestedPort < 65536
+  ? requestedPort
+  : 8080;
 
-const MIME: Record<string, string> = {
+const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -47,23 +47,26 @@ createServer((request, response) => {
     return;
   }
   if (pathname.endsWith('/')) pathname += 'index.html';
+
   const file = resolve(join(root, normalize(pathname)));
   if (file !== root && !file.startsWith(root + sep)) {
     response.writeHead(403).end('forbidden');
     return;
   }
-  let size: number;
+
+  let byteLength: number;
   try {
     const stats = statSync(file);
     if (!stats.isFile()) throw new Error('not a file');
-    size = stats.size;
+    byteLength = stats.size;
   } catch {
     response.writeHead(404).end('not found');
     return;
   }
+
   response.writeHead(200, {
-    'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
-    'content-length': size,
+    'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'content-length': byteLength,
     'cache-control': 'no-store',
   });
   createReadStream(file).pipe(response);

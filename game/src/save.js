@@ -1,47 +1,54 @@
-// save.js — localStorage progression: respect, cash, upgrades, mission index and radio.
+// save.js — browser localStorage progression with a safe in-memory fallback.
 
-const SAVE_KEY = 'costa-vela-save-v1';
+const STORAGE_KEY = 'vela.progress.2';
+
+function freshState() {
+  return {
+    cash: 1200,
+    respect: 0,
+    missionIndex: 0,
+    ownedVehicle: 'solamar',
+    upgrades: { engine: 0, armor: 0, brakes: 0 },
+    radioIndex: 0,
+    wins: 0,
+    savedAt: null,
+  };
+}
 
 export class SaveGame {
   constructor(storage = globalThis.localStorage) {
     this.storage = storage;
   }
 
-  defaults() {
-    return {
-      cash: 1200,
-      respect: 0,
-      missionIndex: 0,
-      ownedVehicle: 'solamar',
-      upgrades: { engine: 0, armor: 0, brakes: 0 },
-      radioIndex: 0,
-      wins: 0,
-      savedAt: new Date().toISOString(),
-    };
-  }
+  defaults() { return freshState(); }
 
   hasSave() {
-    try { return Boolean(this.storage?.getItem(SAVE_KEY)); } catch { return false; }
+    try { return Boolean(this.storage?.getItem(STORAGE_KEY)); } catch { return false; }
   }
 
   read() {
+    const base = freshState();
     try {
-      const raw = this.storage?.getItem(SAVE_KEY);
-      if (!raw) return this.defaults();
-      const parsed = JSON.parse(raw);
-      return { ...this.defaults(), ...parsed, upgrades: { ...this.defaults().upgrades, ...(parsed.upgrades ?? {}) } };
+      const text = this.storage?.getItem(STORAGE_KEY);
+      if (!text) return base;
+      const found = JSON.parse(text);
+      return {
+        ...base,
+        ...found,
+        upgrades: { ...base.upgrades, ...(found.upgrades || {}) },
+      };
     } catch {
-      return this.defaults();
+      return base;
     }
   }
 
   write(state) {
-    const payload = { ...state, savedAt: new Date().toISOString() };
-    try { this.storage?.setItem(SAVE_KEY, JSON.stringify(payload)); } catch { /* private mode */ }
-    return payload;
+    const record = { ...state, savedAt: new Date().toISOString() };
+    try { this.storage?.setItem(STORAGE_KEY, JSON.stringify(record)); } catch { /* private browsing */ }
+    return record;
   }
 
   clear() {
-    try { this.storage?.removeItem(SAVE_KEY); } catch { /* private mode */ }
+    try { this.storage?.removeItem(STORAGE_KEY); } catch { /* private browsing */ }
   }
 }

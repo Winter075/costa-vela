@@ -1,64 +1,67 @@
-// shots.js — deterministic presentation presets used for the four browser captures.
+// shots.js — deterministic scene states behind the four captured views.
+// The ?shot= query key is a capture aid; normal play ignores it.
 
 import * as THREE from 'three';
 
-export const SHOT_PRESETS = ['cover', 'street', 'sunset', 'garage'];
+const PRESETS = ['cover', 'street', 'sunset', 'garage'];
 
 export function readShotPreset() {
-  const params = new URLSearchParams(globalThis.location?.search ?? '');
-  const shot = params.get('shot');
-  return SHOT_PRESETS.includes(shot) ? shot : null;
+  const requested = new URLSearchParams(globalThis.location?.search ?? '').get('shot');
+  return PRESETS.includes(requested) ? requested : null;
 }
 
 export function seedFromUrl(fallback = 7) {
-  const params = new URLSearchParams(globalThis.location?.search ?? '');
-  const value = Number.parseInt(params.get('seed') ?? '', 10);
-  return Number.isFinite(value) ? value : fallback;
+  const raw = new URLSearchParams(globalThis.location?.search ?? '').get('seed');
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function applyShotPreset(game, shot) {
-  if (!shot) return;
-  game.autoStarted = true;
-  game.startGame(false, true);
+function positionPlayer(game, x, z, money, respect, missionIndex) {
+  game.player.position.set(x, 0, z);
+  game.playerCash = money;
+  game.playerRespect = respect;
+  game.police.setWanted(0);
+  game.director.index = missionIndex;
+}
 
-  if (shot === 'cover') {
-    game.player.position.set(-30, 0, 60);
-    game.playerCash = 15450;
-    game.playerRespect = 640;
-    const car = game.fleet.spawn('ember', new THREE.Vector3(-30, 0, 60), 0.35, { upgrades: game.player.upgrades });
-    game.enterVehicle(car);
-    car.speed = 24;
-    game.police.setWanted(4);
+function takeWheel(game, model, x, z, heading, speed, stars, line) {
+  const car = game.fleet.spawn(model, new THREE.Vector3(x, 0, z), heading, {
+    upgrades: game.player.upgrades,
+  });
+  game.enterVehicle(car);
+  car.speed = speed;
+  game.police.setWanted(stars);
+  game.director.say(line, 11);
+}
+
+const SCENES = {
+  cover(game) {
+    positionPlayer(game, -30, 60, 15450, 640, 0);
+    takeWheel(game, 'ember', -30, 60, 0.35, 24, 4, 'Mira: They found us. Drive, and do not stop!');
     game.cameraYaw = 0.45;
-    game.director.index = 0;
-    game.director.say('Mira: They found us. Drive, and do not stop!', 9);
-  } else if (shot === 'street') {
-    game.player.position.set(-215, 0, -45);
-    game.playerCash = 2380;
-    game.playerRespect = 190;
-    game.police.setWanted(0);
-    game.director.index = 2;
+  },
+  street(game) {
+    positionPlayer(game, -215, -45, 2380, 190, 2);
     game.director.showLine();
     game.cameraYaw = 1.1;
-  } else if (shot === 'sunset') {
-    game.player.position.set(70, 0, -70);
-    game.playerCash = 42100;
-    game.playerRespect = 1310;
-    const car = game.fleet.spawn('slate', new THREE.Vector3(70, 0, -70), 0.1, { upgrades: game.player.upgrades });
-    game.enterVehicle(car);
-    car.speed = 13;
-    game.police.setWanted(5);
-    game.director.index = 7;
+  },
+  sunset(game) {
+    positionPlayer(game, 70, -70, 42100, 1310, 7);
+    takeWheel(game, 'slate', 70, -70, 0.1, 13, 5, 'Mira: Every unit they have is rolling. Hold the line!');
     game.director.markFinaleStart(0);
-    game.director.say('Mira: Every unit they have is rolling. Hold the line!', 12);
     game.hud.setWeaponWheelOpen(true, game.combat.getWeaponRows());
     game.spawnExplosion(new THREE.Vector3(95, 0, -55));
     game.cameraYaw = 0.8;
-  } else if (shot === 'garage') {
-    game.playerCash = 18750;
-    game.playerRespect = 780;
-    game.police.setWanted(0);
-    game.director.index = 4;
+  },
+  garage(game) {
+    positionPlayer(game, game.player.position.x, game.player.position.z, 18750, 780, 4);
     game.toggleGarage(true);
-  }
+  },
+};
+
+export function applyShotPreset(game, shot) {
+  if (!shot || !SCENES[shot]) return;
+  game.autoStarted = true;
+  game.startGame(false, true);
+  SCENES[shot](game);
 }

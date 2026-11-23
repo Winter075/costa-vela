@@ -5,127 +5,378 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Costa Vela — Sunset Crimes</title>
 <style>
-  :root { --ink:#f4f1e8; --panel:rgba(10,18,26,.78); --edge:rgba(255,190,110,.32); --gold:#ffc46b; --teal:#5de1d3; }
-  * { box-sizing:border-box; }
-  html, body { margin:0; height:100%; overflow:hidden; background:#111a24; color:var(--ink);
-    font-family:"Segoe UI",Arial,Helvetica,sans-serif; user-select:none; }
-  #scene { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
-  .hidden { display:none !important; }
-  .panel { background:var(--panel); border:1px solid var(--edge); border-radius:8px;
-    box-shadow:0 6px 24px rgba(0,0,0,.42); backdrop-filter:blur(3px); }
+  :root {
+    --ink: #f4f1e8;
+    --panel: rgba(10, 18, 26, .78);
+    --edge: rgba(255, 190, 110, .32);
+    --gold: #ffc46b;
+    --teal: #5de1d3;
+  }
 
-  /* Start screen */
-  #start-screen { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:radial-gradient(circle at 62% 34%, rgba(255,156,79,.28), transparent 46%), linear-gradient(160deg,#101a28,#33212a 62%,#0e141d); z-index:40; }
-  #start-screen h1 { font-size:74px; letter-spacing:7px; margin:0; color:#ffe0a8; text-shadow:0 4px 0 #a7523a,0 12px 30px #000; }
-  #start-screen h2 { margin:6px 0 24px; font-weight:400; letter-spacing:9px; font-size:15px; color:var(--teal); }
-  .start-buttons { display:flex; gap:14px; }
-  .start-buttons button, .menu-button { padding:12px 24px; border-radius:5px; border:1px solid var(--gold);
-    background:linear-gradient(180deg,#ffd28b,#e69a54); color:#271a16; font-weight:700; font-size:14px; cursor:pointer; letter-spacing:.6px; }
-  .start-buttons button:disabled { opacity:.4; cursor:not-allowed; }
-  .start-buttons button.secondary, .menu-button.secondary { background:rgba(12,22,30,.7); color:var(--gold); }
-  #start-screen p { max-width:620px; text-align:center; line-height:1.6; color:#c9d3d8; font-size:13px; margin-top:26px; }
+  * { box-sizing: border-box; }
 
-  /* HUD panels */
-  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; }
-  #objective-panel { position:absolute; left:18px; top:16px; width:298px; padding:12px 14px; }
-  .eyebrow { font-size:10px; letter-spacing:2px; color:var(--gold); text-transform:uppercase; }
-  #obj-number { float:right; color:var(--teal); font-weight:700; font-size:11px; }
-  #obj-title { font-size:20px; font-weight:700; margin:6px 0 4px; color:#fff6df; }
-  #obj-stage { font-size:12px; color:#dce7ea; }
-  #obj-next { font-size:10px; color:var(--teal); margin-top:7px; letter-spacing:.7px; }
-  #obj-character { font-size:10px; color:#b8c6cc; margin-top:3px; font-style:italic; }
-  #response-panel { position:absolute; left:18px; top:146px; width:298px; padding:10px 12px 8px; }
-  #response-panel.quiet { opacity:.68; }
-  .response-row { display:grid; grid-template-columns:1fr auto 44px; gap:6px; font-size:10px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.06); }
-  .response-row .unit-name { color:#ffd9a8; }
-  .response-row .unit-status { color:#ff8d8d; font-weight:700; letter-spacing:.4px; }
-  .response-row .unit-distance { color:#a9c4cd; text-align:right; }
-  .response-row.empty { display:block; color:#9db4bc; font-size:10px; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #111a24;
+    color: var(--ink);
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    user-select: none;
+  }
 
-  #wanted-panel { position:absolute; right:18px; top:16px; width:292px; padding:10px 14px; text-align:right; }
-  #wanted-stars { color:#ffca63; font-size:27px; letter-spacing:3px; line-height:1; text-shadow:0 0 16px rgba(255,170,50,.6); }
-  .money-line { display:flex; justify-content:space-between; font-size:12px; margin-top:7px; }
-  .money-line span:last-child { color:#ffe0a2; font-weight:700; }
-  #hud-rank { color:var(--teal); font-size:10px; letter-spacing:1px; }
+  #scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
 
-  #weapon-panel { position:absolute; right:18px; top:142px; width:292px; }
-  .weapon-slot { display:grid; grid-template-columns:22px 1fr auto; align-items:center; gap:7px; padding:5px 9px;
-    margin-bottom:3px; font-size:11px; background:rgba(10,18,26,.72); border:1px solid rgba(255,255,255,.09);
-    border-left:3px solid var(--slot-color); border-radius:3px; }
-  .weapon-slot b { color:var(--slot-color); font-size:12px; }
-  .weapon-slot i { color:#cfd8dc; font-style:normal; font-size:10px; }
-  .weapon-slot.active { background:rgba(255,190,100,.2); border-color:var(--slot-color); color:#fff5df; }
-  #crew-cards { margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-  .crew-card { display:flex; align-items:center; gap:6px; padding:5px 7px; background:rgba(9,16,23,.72);
-    border:1px solid rgba(255,255,255,.08); border-left:2px solid var(--crew-color); border-radius:4px; }
-  .crew-initials { background:var(--crew-color); color:#111; font-weight:800; font-size:9px; padding:3px 4px; border-radius:3px; }
-  .crew-card strong { display:block; font-size:10px; color:#eef3f4; }
-  .crew-card small { display:block; font-size:8px; color:#a8bbc2; }
+  .hidden { display: none !important; }
 
-  #minimap-panel { position:absolute; left:18px; bottom:18px; padding:7px; }
-  #minimap-canvas { display:block; width:176px; height:176px; border-radius:4px; }
-  #minimap-label { font-size:9px; letter-spacing:1.5px; color:var(--gold); text-align:center; margin-top:4px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .42);
+    backdrop-filter: blur(3px);
+  }
 
-  #vehicle-panel { position:absolute; right:18px; bottom:18px; width:292px; padding:10px 13px; }
-  .speed-line { display:flex; align-items:baseline; justify-content:space-between; }
-  #speed-value { font-size:38px; font-weight:800; color:#fff1cf; line-height:1; }
-  .speed-line small { font-size:10px; color:#b7c8cf; letter-spacing:1px; }
-  #vehicle-name { font-size:11px; color:var(--teal); margin:3px 0 8px; }
-  .bar { height:7px; background:rgba(255,255,255,.12); border-radius:4px; overflow:hidden; }
-  #condition-fill { height:100%; width:100%; background:#6de3b0; transition:width .2s; }
-  #condition-text { font-size:9px; color:#c5d4d8; margin-top:4px; letter-spacing:.6px; }
-  #radio-line { margin-top:8px; border-top:1px solid rgba(255,255,255,.1); padding-top:6px; }
-  #radio-station { font-size:11px; color:#ffd28b; font-weight:700; }
-  #radio-track { font-size:10px; color:#c7d6da; }
+  /* Title screen */
+  #start-screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 62% 34%, rgba(255, 156, 79, .28), transparent 46%),
+                linear-gradient(160deg, #101a28, #33212a 62%, #0e141d);
+    z-index: 40;
+  }
 
-  #subtitle { position:absolute; left:50%; bottom:30px; transform:translateX(-50%); max-width:640px; text-align:center;
-    padding:10px 20px; font-size:15px; color:#fff5df; background:rgba(8,14,20,.82); border-left:3px solid var(--gold);
-    border-right:3px solid var(--gold); border-radius:4px; text-shadow:0 1px 3px #000; }
-  #toast { position:absolute; left:50%; top:22px; transform:translateX(-50%); padding:8px 18px; font-size:13px;
-    color:#13221d; background:linear-gradient(90deg,#6de3b0,#c9f7c7); border-radius:4px; font-weight:700; }
-  #race-panel { position:absolute; left:50%; top:88px; transform:translateX(-50%); padding:8px 16px; font-size:12px;
-    color:#ffe1a3; background:rgba(20,10,12,.8); border:1px solid #ffb45c; border-radius:5px; }
-  #crosshair { position:absolute; left:50%; top:50%; width:5px; height:5px; margin:-2px; border-radius:50%;
-    background:rgba(255,255,255,.7); box-shadow:0 0 8px rgba(255,255,255,.6); }
-  #damage-vignette { position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .3s;
-    box-shadow:inset 0 0 180px 60px rgba(180,30,30,.75); }
-  .damage-pulse { animation:hitflash .35s ease-out; }
-  @keyframes hitflash { 0%{box-shadow:inset 0 0 220px 90px rgba(255,40,40,.9)} 100%{box-shadow:inset 0 0 180px 60px rgba(180,30,30,.4)} }
+  #start-screen h1 {
+    font-size: 74px;
+    letter-spacing: 7px;
+    margin: 0;
+    color: #ffe0a8;
+    text-shadow: 0 4px 0 #a7523a, 0 12px 30px #000;
+  }
 
-  /* Weapon wheel and garage */
-  #weapon-wheel { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
-    background:rgba(6,10,14,.55); pointer-events:none; }
-  #weapon-wheel-inner { width:520px; padding:22px; }
-  #weapon-wheel h3 { text-align:center; letter-spacing:4px; color:var(--gold); margin:0 0 14px; }
-  #weapon-wheel-slots { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .wheel-slot { display:grid; grid-template-columns:30px 1fr auto; align-items:center; gap:8px; padding:10px;
-    background:rgba(12,20,28,.93); border:1px solid var(--slot-color); border-radius:5px; font-size:12px; }
-  .wheel-key { background:var(--slot-color); color:#111; font-weight:800; text-align:center; border-radius:3px; padding:3px; }
-  .wheel-active { box-shadow:0 0 18px var(--slot-color); background:rgba(50,38,30,.95); }
-  .wheel-slot small { color:#b8c7cc; }
+  #start-screen h2 {
+    margin: 6px 0 24px;
+    font-weight: 400;
+    letter-spacing: 9px;
+    font-size: 15px;
+    color: var(--teal);
+  }
 
-  #garage-screen { position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
-    background:radial-gradient(circle at 30% 20%,rgba(255,160,80,.15),transparent 50%),rgba(5,10,16,.9); }
-  #garage-inner { width:min(960px,94vw); max-height:92vh; overflow:auto; padding:24px; }
-  #garage-inner h2 { margin:0; font-size:30px; color:#ffe0a8; letter-spacing:4px; }
-  .garage-top { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1px solid var(--edge); padding-bottom:12px; }
-  .garage-stats { display:flex; gap:22px; font-size:13px; }
-  .garage-stats strong { color:var(--teal); display:block; font-size:17px; }
-  #garage-list { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:16px 0; }
-  .vehicle-card { display:flex; align-items:center; gap:9px; padding:9px; cursor:pointer; color:var(--ink); text-align:left;
-    background:rgba(20,30,40,.85); border:1px solid rgba(255,255,255,.12); border-radius:5px; font-size:11px; }
-  .vehicle-card.owned { border-color:var(--gold); background:rgba(90,60,30,.5); }
-  .vehicle-swatch { width:26px; height:14px; border-radius:3px; border:1px solid rgba(255,255,255,.4); }
-  .vehicle-card small { display:block; color:#9fb1b8; font-size:9px; }
-  .upgrade-row { display:grid; grid-template-columns:1fr 100px 110px; align-items:center; gap:10px; padding:8px 0;
-    border-bottom:1px solid rgba(255,255,255,.07); font-size:12px; }
-  .upgrade-level { color:var(--teal); letter-spacing:2px; }
-  .upgrade-button { padding:6px; background:#31485a; color:#ffe1b0; border:1px solid var(--gold); border-radius:4px; cursor:pointer; font-size:10px; }
-  .garage-footer { display:flex; justify-content:space-between; align-items:center; margin-top:18px; }
-  #garage-save-time { font-size:10px; color:#9fb1b8; }
-  #hud-help { position:fixed; left:50%; bottom:4px; transform:translateX(-50%); z-index:11; font-size:9px;
-    color:rgba(255,255,255,.5); letter-spacing:1px; pointer-events:none; }
+  #start-screen p {
+    max-width: 620px;
+    text-align: center;
+    line-height: 1.6;
+    color: #c9d3d8;
+    font-size: 13px;
+    margin-top: 26px;
+  }
+
+  .start-buttons { display: flex; gap: 14px; }
+
+  .start-buttons button, .menu-button {
+    padding: 12px 24px;
+    border-radius: 5px;
+    border: 1px solid var(--gold);
+    background: linear-gradient(180deg, #ffd28b, #e69a54);
+    color: #271a16;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: .6px;
+  }
+
+  .start-buttons button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .start-buttons button.secondary, .menu-button.secondary {
+    background: rgba(12, 22, 30, .7);
+    color: var(--gold);
+  }
+
+  /* Heads-up display */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+  #objective-panel { position: absolute; left: 18px; top: 16px; width: 298px; padding: 12px 14px; }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+
+  #obj-number { float: right; color: var(--teal); font-weight: 700; font-size: 11px; }
+  #obj-title { font-size: 20px; font-weight: 700; margin: 6px 0 4px; color: #fff6df; }
+  #obj-stage { font-size: 12px; color: #dce7ea; }
+  #obj-next { font-size: 10px; color: var(--teal); margin-top: 7px; letter-spacing: .7px; }
+  #obj-character { font-size: 10px; color: #b8c6cc; margin-top: 3px; font-style: italic; }
+
+  #response-panel { position: absolute; left: 18px; top: 146px; width: 298px; padding: 10px 12px 8px; }
+  #response-panel.quiet { opacity: .68; }
+
+  .response-row {
+    display: grid;
+    grid-template-columns: 1fr auto 44px;
+    gap: 6px;
+    font-size: 10px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+  }
+
+  .response-row .unit-name { color: #ffd9a8; }
+  .response-row .unit-status { color: #ff8d8d; font-weight: 700; letter-spacing: .4px; }
+  .response-row .unit-distance { color: #a9c4cd; text-align: right; }
+  .response-row.empty { display: block; color: #9db4bc; font-size: 10px; }
+
+  #wanted-panel { position: absolute; right: 18px; top: 16px; width: 292px; padding: 10px 14px; text-align: right; }
+
+  #wanted-stars {
+    color: #ffca63;
+    font-size: 27px;
+    letter-spacing: 3px;
+    line-height: 1;
+    text-shadow: 0 0 16px rgba(255, 170, 50, .6);
+  }
+
+  .money-line { display: flex; justify-content: space-between; font-size: 12px; margin-top: 7px; }
+  .money-line span:last-child { color: #ffe0a2; font-weight: 700; }
+  #hud-rank { color: var(--teal); font-size: 10px; letter-spacing: 1px; }
+
+  #weapon-panel { position: absolute; right: 18px; top: 142px; width: 292px; }
+
+  .weapon-slot {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 9px;
+    margin-bottom: 3px;
+    font-size: 11px;
+    background: rgba(10, 18, 26, .72);
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-left: 3px solid var(--slot-color);
+    border-radius: 3px;
+  }
+
+  .weapon-slot b { color: var(--slot-color); font-size: 12px; }
+  .weapon-slot i { color: #cfd8dc; font-style: normal; font-size: 10px; }
+  .weapon-slot.active { background: rgba(255, 190, 100, .2); border-color: var(--slot-color); color: #fff5df; }
+
+  #crew-cards { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+
+  .crew-card {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 7px;
+    background: rgba(9, 16, 23, .72);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-left: 2px solid var(--crew-color);
+    border-radius: 4px;
+  }
+
+  .crew-initials {
+    background: var(--crew-color);
+    color: #111;
+    font-weight: 800;
+    font-size: 9px;
+    padding: 3px 4px;
+    border-radius: 3px;
+  }
+
+  .crew-card strong { display: block; font-size: 10px; color: #eef3f4; }
+  .crew-card small { display: block; font-size: 8px; color: #a8bbc2; }
+
+  #minimap-panel { position: absolute; left: 18px; bottom: 18px; padding: 7px; }
+  #minimap-canvas { display: block; width: 176px; height: 176px; border-radius: 4px; }
+  #minimap-label { font-size: 9px; letter-spacing: 1.5px; color: var(--gold); text-align: center; margin-top: 4px; }
+
+  #vehicle-panel { position: absolute; right: 18px; bottom: 18px; width: 292px; padding: 10px 13px; }
+  .speed-line { display: flex; align-items: baseline; justify-content: space-between; }
+  #speed-value { font-size: 38px; font-weight: 800; color: #fff1cf; line-height: 1; }
+  .speed-line small { font-size: 10px; color: #b7c8cf; letter-spacing: 1px; }
+  #vehicle-name { font-size: 11px; color: var(--teal); margin: 3px 0 8px; }
+  .bar { height: 7px; background: rgba(255, 255, 255, .12); border-radius: 4px; overflow: hidden; }
+  #condition-fill { height: 100%; width: 100%; background: #6de3b0; transition: width .2s; }
+  #condition-text { font-size: 9px; color: #c5d4d8; margin-top: 4px; letter-spacing: .6px; }
+  #radio-line { margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, .1); padding-top: 6px; }
+  #radio-station { font-size: 11px; color: #ffd28b; font-weight: 700; }
+  #radio-track { font-size: 10px; color: #c7d6da; }
+
+  #subtitle {
+    position: absolute;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    max-width: 640px;
+    text-align: center;
+    padding: 10px 20px;
+    font-size: 15px;
+    color: #fff5df;
+    background: rgba(8, 14, 20, .82);
+    border-left: 3px solid var(--gold);
+    border-right: 3px solid var(--gold);
+    border-radius: 4px;
+    text-shadow: 0 1px 3px #000;
+  }
+
+  #toast {
+    position: absolute;
+    left: 50%;
+    top: 22px;
+    transform: translateX(-50%);
+    padding: 8px 18px;
+    font-size: 13px;
+    color: #13221d;
+    background: linear-gradient(90deg, #6de3b0, #c9f7c7);
+    border-radius: 4px;
+    font-weight: 700;
+  }
+
+  #race-panel {
+    position: absolute;
+    left: 50%;
+    top: 88px;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    font-size: 12px;
+    color: #ffe1a3;
+    background: rgba(20, 10, 12, .8);
+    border: 1px solid #ffb45c;
+    border-radius: 5px;
+  }
+
+  #crosshair {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    margin: -2px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .7);
+    box-shadow: 0 0 8px rgba(255, 255, 255, .6);
+  }
+
+  #damage-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s;
+    box-shadow: inset 0 0 180px 60px rgba(180, 30, 30, .75);
+  }
+
+  .damage-pulse { animation: hitflash .35s ease-out; }
+
+  @keyframes hitflash {
+    0% { box-shadow: inset 0 0 220px 90px rgba(255, 40, 40, .9); }
+    100% { box-shadow: inset 0 0 180px 60px rgba(180, 30, 30, .4); }
+  }
+
+  /* Weapon wheel and workshop */
+  #weapon-wheel {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(6, 10, 14, .55);
+    pointer-events: none;
+  }
+
+  #weapon-wheel-inner { width: 520px; padding: 22px; }
+  #weapon-wheel h3 { text-align: center; letter-spacing: 4px; color: var(--gold); margin: 0 0 14px; }
+  #weapon-wheel-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .wheel-slot {
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(12, 20, 28, .93);
+    border: 1px solid var(--slot-color);
+    border-radius: 5px;
+    font-size: 12px;
+  }
+
+  .wheel-key { background: var(--slot-color); color: #111; font-weight: 800; text-align: center; border-radius: 3px; padding: 3px; }
+  .wheel-active { box-shadow: 0 0 18px var(--slot-color); background: rgba(50, 38, 30, .95); }
+  .wheel-slot small { color: #b8c7cc; }
+
+  #garage-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 30% 20%, rgba(255, 160, 80, .15), transparent 50%), rgba(5, 10, 16, .9);
+  }
+
+  #garage-inner { width: min(960px, 94vw); max-height: 92vh; overflow: auto; padding: 24px; }
+  #garage-inner h2 { margin: 0; font-size: 30px; color: #ffe0a8; letter-spacing: 4px; }
+  .garage-top { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--edge); padding-bottom: 12px; }
+  .garage-stats { display: flex; gap: 22px; font-size: 13px; }
+  .garage-stats strong { color: var(--teal); display: block; font-size: 17px; }
+  #garage-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+
+  .vehicle-card {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px;
+    cursor: pointer;
+    color: var(--ink);
+    text-align: left;
+    background: rgba(20, 30, 40, .85);
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 5px;
+    font-size: 11px;
+  }
+
+  .vehicle-card.owned { border-color: var(--gold); background: rgba(90, 60, 30, .5); }
+  .vehicle-swatch { width: 26px; height: 14px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .4); }
+  .vehicle-card small { display: block; color: #9fb1b8; font-size: 9px; }
+
+  .upgrade-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 110px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .07);
+    font-size: 12px;
+  }
+
+  .upgrade-level { color: var(--teal); letter-spacing: 2px; }
+  .upgrade-button { padding: 6px; background: #31485a; color: #ffe1b0; border: 1px solid var(--gold); border-radius: 4px; cursor: pointer; font-size: 10px; }
+  .garage-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; }
+  #garage-save-time { font-size: 10px; color: #9fb1b8; }
+
+  #hud-help {
+    position: fixed;
+    left: 50%;
+    bottom: 4px;
+    transform: translateX(-50%);
+    z-index: 11;
+    font-size: 9px;
+    color: rgba(255, 255, 255, .5);
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
 </style>
 <script type="importmap">
 {"imports":{"three":"./vendor/three.min.js"}}
@@ -142,10 +393,12 @@
     <div id="obj-next">NEXT · Meet Mira by the palms</div>
     <div id="obj-character">Mira Solano</div>
   </div>
+
   <div id="response-panel" class="panel">
     <span class="eyebrow">POLICE RESPONSE</span>
     <div id="response-rows"></div>
   </div>
+
   <div id="wanted-panel" class="panel">
     <span class="eyebrow">WANTED LEVEL</span>
     <div id="wanted-stars">☆☆☆☆☆</div>
@@ -153,37 +406,54 @@
     <div class="money-line"><span>RESPECT</span><span id="hud-respect">0</span></div>
     <div id="hud-rank">FRESH TIDE</div>
   </div>
+
   <div id="weapon-panel">
     <div id="weapon-slots"></div>
     <div id="crew-cards"></div>
   </div>
+
   <div id="minimap-panel" class="panel">
     <canvas id="minimap-canvas" width="176" height="176"></canvas>
     <div id="minimap-label">COSTA VELA · CITY MAP</div>
   </div>
+
   <div id="vehicle-panel" class="panel">
     <div class="speed-line"><span id="speed-value">0</span><small>KM/H</small></div>
     <div id="vehicle-name">ON FOOT</div>
     <div class="bar"><div id="condition-fill"></div></div>
     <div id="condition-text">HEALTH 100%</div>
-    <div id="radio-line"><span id="radio-station">Costa FM 99.4</span><br><span id="radio-track">♪ Sunset on the Causeway</span></div>
+    <div id="radio-line">
+      <span id="radio-station">Costa FM 99.4</span><br>
+      <span id="radio-track">♪ Sunset on the Causeway</span>
+    </div>
   </div>
+
   <div id="subtitle" class="hidden"></div>
   <div id="toast" class="hidden"></div>
-  <div id="race-panel" class="hidden"><span class="eyebrow">SIDE ACTIVITY · STREET RACE</span><br><span id="race-text"></span></div>
+  <div id="race-panel" class="hidden">
+    <span class="eyebrow">SIDE ACTIVITY · STREET RACE</span><br>
+    <span id="race-text"></span>
+  </div>
   <div id="crosshair"></div>
   <div id="damage-vignette"></div>
 </div>
+
 <div id="hud-help" class="hidden">WASD MOVE / DRIVE · SPACE HANDBRAKE · E VEHICLE · 1-6 WEAPONS · DRAG LOOK · TAB WHEEL · G GARAGE · R RADIO</div>
 
 <div id="weapon-wheel" class="hidden">
-  <div id="weapon-wheel-inner" class="panel"><h3>WEAPON WHEEL</h3><div id="weapon-wheel-slots"></div></div>
+  <div id="weapon-wheel-inner" class="panel">
+    <h3>WEAPON WHEEL</h3>
+    <div id="weapon-wheel-slots"></div>
+  </div>
 </div>
 
 <div id="garage-screen" class="hidden">
   <div id="garage-inner" class="panel">
     <div class="garage-top">
-      <div><h2>TERN GARAGE</h2><span class="eyebrow">VEHICLE UPGRADES · PROGRESSION</span></div>
+      <div>
+        <h2>TERN GARAGE</h2>
+        <span class="eyebrow">VEHICLE UPGRADES · PROGRESSION</span>
+      </div>
       <div class="garage-stats">
         <div>CASH<strong id="garage-cash">$1,200</strong></div>
         <div>RESPECT<strong id="garage-respect">0 · Fresh Tide</strong></div>
@@ -195,7 +465,10 @@
     <div id="upgrade-list"></div>
     <div class="garage-footer">
       <span id="garage-save-time">Not saved yet</span>
-      <div><button class="menu-button secondary" id="btn-save">SAVE GAME</button> <button class="menu-button" id="btn-close-garage">CLOSE GARAGE</button></div>
+      <div>
+        <button class="menu-button secondary" id="btn-save">SAVE GAME</button>
+        <button class="menu-button" id="btn-close-garage">CLOSE GARAGE</button>
+      </div>
     </div>
   </div>
 </div>
